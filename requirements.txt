@@ -1,0 +1,24 @@
+# ML
+torch>=2.3.0
+transformers>=4.44.0
+datasets>=2.20.0
+accelerate>=0.34.0
+Pillow>=10.0.0
+
+# 평가
+seqeval>=1.2.2
+scikit-learn>=1.5.0
+
+# PDF 처리
+pymupdf>=1.24.0          # 합성 PDF 텍스트+bbox 추출
+easyocr>=1.7.1           # 실제 문서 OCR (별도 바이너리 설치 불필요)
+
+# 실험 추적
+tensorboard>=2.17.0
+
+# 유틸
+pyyaml>=6.0.1
+tqdm>=4.66.0
+pandas>=2.2.0
+numpy>=1.26.0
+scipy>=1.13.0

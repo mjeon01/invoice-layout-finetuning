@@ -1,0 +1,35 @@
+model_name: "bert-base-uncased"
+model_type: "bert"
+num_labels: 45       # O + B/I * 22 entity types
+max_seq_length: 512
+
+# Batch & memory (BERT has no visual inputs — larger batch feasible)
+per_device_train_batch_size: 16
+per_device_eval_batch_size: 32
+gradient_accumulation_steps: 1   # effective batch = 16
+
+# Optimization
+num_train_epochs: 10
+learning_rate: 3.0e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+lr_scheduler_type: "linear"
+adam_epsilon: 1.0e-8
+
+# Checkpointing
+output_dir: "models/bert-baseline-invoice"
+save_strategy: "epoch"
+evaluation_strategy: "epoch"
+save_total_limit: 3
+load_best_model_at_end: true
+metric_for_best_model: "eval_f1"
+greater_is_better: true
+
+# Hardware
+fp16: true
+dataloader_num_workers: 0
+
+# Logging
+logging_steps: 10
+report_to: "tensorboard"
+logging_dir: "runs/bert_baseline"

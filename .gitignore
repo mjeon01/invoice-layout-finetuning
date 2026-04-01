@@ -1,0 +1,6 @@
+.sixth/
+data/
+models/
+runs/
+*.pdf
+*.arrow
