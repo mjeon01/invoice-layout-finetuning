@@ -109,9 +109,8 @@
 
   선행 연구의 권장 설정을 초기값으로 채택하고, 이후 검증 손실 기반으로 하이퍼파라미터를 조정할 예정입니다.
 
+  
   ---
-
-
 
   ## 총 파이프라인
 
@@ -213,3 +212,14 @@
     │  KIE 정확도         -            -            -                     │
     └─────────────────────────────────────────────────────────────────────┘
   ```
+
+---
+
+## 참고 문헌
+
+| 논문 | 활용 근거 |
+|------|-----------|
+| Huang et al. (2022). *LayoutLMv3: Pre-training for Document AI with Unified Text and Image Masking.* ACM MM | 모델 선택 및 토큰 분류 파인튜닝 방식 근거 |
+| Šimsa et al. (2023). *DocILE Benchmark for Document Information Localization and Extraction.* ICDAR | 합성 데이터 전략 및 학습 설정 근거 |
+| PEneo (2024). *Unifying Line Extraction, Line Grouping, and Entity Linking.* ACM MM | BIO 태깅 + 입력 정렬 방식 근거 |
+| DocExtractNet (2025). *A novel framework for enhanced information extraction from business documents.* ScienceDirect | 인보이스 도메인 파인튜닝 실증 근거 |
