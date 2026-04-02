@@ -4,3 +4,6 @@
 runs/
 *.pdf
 *.arrow
+check_pdf.py
+check_pdf2.py
+inspect_data.py
