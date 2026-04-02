@@ -29,7 +29,13 @@ class InvoiceNERTrainer(Trainer):
         trainer.train()
     """
 
-    def compute_metrics(self, eval_pred) -> dict:
+    def __init__(self, *args, **kwargs):
+        # Trainer.__init__ sets self.compute_metrics = kwargs.get("compute_metrics", None),
+        # which would shadow our method override. Inject it here so the parent stores it.
+        kwargs.setdefault("compute_metrics", self._compute_metrics_impl)
+        super().__init__(*args, **kwargs)
+
+    def _compute_metrics_impl(self, eval_pred) -> dict:
         """
         Called by Trainer after each eval pass.
 

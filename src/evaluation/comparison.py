@@ -1,75 +1,143 @@
 """
-Side-by-side comparison report: BERT baseline vs LayoutLMv3.
+Multi-model comparison report for invoice NER.
 
-Produces a Markdown table showing per-field F1 for both models
-and highlights fields where layout features provide ≥ 5% absolute improvement.
+Produces a Markdown table showing per-field F1 for all evaluated models
+and highlights fields where LayoutLMv3 (full) provides ≥ 5 pp improvement
+over BERT.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from ..data.label_schema import ENTITY_TYPES
 
+# Display order for models (left → right in the table)
+_MODEL_ORDER = ["BERT", "LMv3 (no bbox)", "LMv3 (no image)", "LayoutLMv3"]
+_THRESHOLD = 0.05  # 5 pp improvement to highlight with ★
+
 
 def generate_comparison_report(
-    layoutlmv3_results: dict,
-    bert_results: dict,
+    results: dict[str, dict],
     output_path: Path | None = None,
 ) -> str:
     """
-    Generate a Markdown comparison table.
+    Generate a Markdown comparison table for all evaluated models.
 
     Args:
-        layoutlmv3_results: Output of compute_entity_metrics() for LayoutLMv3.
-        bert_results:       Output of compute_entity_metrics() for BERT.
-        output_path:        If provided, save the Markdown string here.
+        results:     Dict mapping model name → compute_entity_metrics() output.
+                     Expected keys: "BERT", "LMv3 (no bbox)", "LMv3 (no image)", "LayoutLMv3"
+                     (subset is also accepted — missing models are omitted from the table).
+        output_path: If provided, save the Markdown string here.
 
     Returns:
         Markdown string.
     """
-    lv3_per  = layoutlmv3_results.get("per_entity", {})
-    bert_per = bert_results.get("per_entity", {})
+    # Determine column order (only include models present in results)
+    model_names = [m for m in _MODEL_ORDER if m in results]
+    # Append any extra models not in the default order
+    for m in results:
+        if m not in model_names:
+            model_names.append(m)
 
-    THRESHOLD = 0.05  # 5 pp improvement to highlight
+    # Header
+    col_header = " | ".join(f"{m} F1" for m in model_names)
+    col_sep    = " | ".join("-------" for _ in model_names)
 
     lines = [
-        "# BERT Baseline vs LayoutLMv3 — Entity-Level F1 on Real 41 Documents",
+        "# Invoice NER — Multi-Model Comparison (Entity-Level F1)",
         "",
-        f"**LayoutLMv3 macro F1**: {layoutlmv3_results.get('f1', 0):.4f}",
-        f"**BERT macro F1**:       {bert_results.get('f1', 0):.4f}",
+        "평가 데이터: 실제 수산물 무역 인보이스 41건  ",
+        "학습 데이터: 합성 인보이스 800건  ",
+        "지표: seqeval 엔티티 단위 매크로 F1 (배경 토큰 제외)",
         "",
-        "Fields marked with ★ show ≥ 5 pp absolute F1 improvement with LayoutLMv3.",
+        "## 전체 요약",
         "",
-        "| Field | BERT F1 | LayoutLMv3 F1 | Δ F1 | Note |",
-        "|-------|---------|---------------|------|------|",
+        f"| 모델 | Precision | Recall | F1 |",
+        f"|------|-----------|--------|----|",
     ]
-
-    for entity in ENTITY_TYPES:
-        bert_f1 = bert_per.get(entity, {}).get("f1", 0.0)
-        lv3_f1  = lv3_per.get(entity, {}).get("f1", 0.0)
-        delta   = lv3_f1 - bert_f1
-        note    = "★ layout helps" if delta >= THRESHOLD else ""
+    for m in model_names:
+        r = results[m]
         lines.append(
-            f"| {entity} | {bert_f1:.4f} | {lv3_f1:.4f} | "
-            f"{delta:+.4f} | {note} |"
+            f"| {m} | {r.get('precision', 0):.4f} | "
+            f"{r.get('recall', 0):.4f} | {r.get('f1', 0):.4f} |"
         )
 
     lines += [
         "",
-        "| **Macro Avg** | "
-        f"**{bert_results.get('f1', 0):.4f}** | "
-        f"**{layoutlmv3_results.get('f1', 0):.4f}** | "
-        f"**{layoutlmv3_results.get('f1', 0) - bert_results.get('f1', 0):+.4f}** | |",
+        "## 필드별 F1",
         "",
-        "## Notes",
+        f"| 필드 | {col_header} | 비고 |",
+        f"|------|{col_sep}|------|",
+    ]
+
+    bert_per = results.get("BERT", {}).get("per_entity", {})
+    lv3_per  = results.get("LayoutLMv3", {}).get("per_entity", {})
+
+    for entity in ENTITY_TYPES:
+        cols = []
+        for m in model_names:
+            f1 = results[m].get("per_entity", {}).get(entity, {}).get("f1", 0.0)
+            cols.append(f"{f1:.4f}")
+
+        # Highlight if LayoutLMv3 improves ≥ THRESHOLD over BERT
+        bert_f1 = bert_per.get(entity, {}).get("f1", 0.0)
+        lv3_f1  = lv3_per.get(entity, {}).get("f1", 0.0)
+        note = "★ 레이아웃 효과" if (lv3_f1 - bert_f1) >= _THRESHOLD else ""
+
+        lines.append(f"| {entity} | {' | '.join(cols)} | {note} |")
+
+    # Macro avg row
+    macro_cols = []
+    for m in model_names:
+        macro_cols.append(f"**{results[m].get('f1', 0):.4f}**")
+    lines.append(f"| **Macro Avg** | {' | '.join(macro_cols)} | |")
+
+    # KIE summary table — per model: Precision / Recall / F1
+    kie_col_header = " | ".join(f"{m} P | {m} R | {m} F1" for m in model_names)
+    kie_col_sep    = " | ".join("------:| ------:| ------:" for _ in model_names)
+
+    lines += [
         "",
-        "- Training set: 900 synthetic invoices (identical for both models)",
-        "- Evaluation set: 41 real seafood trade invoices",
-        "- BERT: text-only BIO tagging (no bounding boxes, no image)",
-        "- LayoutLMv3: text + bounding boxes + image patches",
-        "- Metric: seqeval macro entity-level F1 (spans, excluding O)",
+        "## KIE 정확도 (필드값 일치율)",
+        "",
+        "모델이 추출한 텍스트 값과 정답값의 정확 일치 여부를 필드별로 측정합니다.",
+        "",
+        f"| 필드 | {kie_col_header} |",
+        f"|------|{kie_col_sep}|",
+    ]
+
+    for entity in ENTITY_TYPES:
+        kie_cols = []
+        for m in model_names:
+            ep = results[m].get("kie_metrics", {}).get("per_entity", {}).get(entity, {})
+            p  = ep.get("precision", 0.0)
+            r  = ep.get("recall",    0.0)
+            f1 = ep.get("f1",        0.0)
+            kie_cols.append(f"{p:.4f} | {r:.4f} | {f1:.4f}")
+        lines.append(f"| {entity} | {' | '.join(kie_cols)} |")
+
+    kie_macro_cols = []
+    for m in model_names:
+        km = results[m].get("kie_metrics", {})
+        p  = km.get("kie_precision", 0.0)
+        r  = km.get("kie_recall",    0.0)
+        f1 = km.get("kie_f1",        0.0)
+        kie_macro_cols.append(f"**{p:.4f}** | **{r:.4f}** | **{f1:.4f}**")
+    lines.append(f"| **Macro Avg** | {' | '.join(kie_macro_cols)} |")
+
+    lines += [
+        "",
+        "## 실험 조건",
+        "",
+        "| 모델 | 텍스트 | 위치(bbox) | 이미지 |",
+        "|------|:------:|:----------:|:------:|",
+        "| BERT | ✅ | ❌ | ❌ |",
+        "| LMv3 (no bbox) | ✅ | ❌ | ✅ |",
+        "| LMv3 (no image) | ✅ | ✅ | ❌ |",
+        "| LayoutLMv3 | ✅ | ✅ | ✅ |",
+        "",
+        "> ★ : LayoutLMv3 전체 모델이 BERT 대비 F1이 5%p 이상 향상된 필드",
     ]
 
     md = "\n".join(lines)
@@ -83,6 +151,6 @@ def generate_comparison_report(
     return md
 
 
-def print_comparison_table(layoutlmv3_results: dict, bert_results: dict) -> None:
+def print_comparison_table(results: dict[str, dict]) -> None:
     """Print the comparison report to stdout."""
-    print(generate_comparison_report(layoutlmv3_results, bert_results))
+    print(generate_comparison_report(results))

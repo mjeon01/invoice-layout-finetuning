@@ -46,6 +46,9 @@ class TrainingConfig:
     metric_for_best_model: str    = "eval_f1"
     greater_is_better: bool       = True
 
+    # ---- Ablation ----
+    ablation: str = ""   # "" | "no_bbox" | "no_image"
+
     # ---- Hardware ----
     fp16: bool  = True
     dataloader_num_workers: int = 0   # 0 required on Windows

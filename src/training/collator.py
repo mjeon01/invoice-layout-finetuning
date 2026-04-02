@@ -21,9 +21,7 @@ from transformers import (
 )
 
 
-# ---------------------------------------------------------------------------
 # Shared label-alignment utility
-# ---------------------------------------------------------------------------
 
 def align_labels_with_tokens(
     word_ids: list[int | None],
@@ -58,10 +56,8 @@ def align_labels_with_tokens(
     return aligned
 
 
-# ---------------------------------------------------------------------------
-# LayoutLMv3 collator
-# ---------------------------------------------------------------------------
 
+# LayoutLMv3 collator
 class LayoutLMv3DataCollator:
     """
     Collator for LayoutLMv3 token classification.
@@ -70,6 +66,11 @@ class LayoutLMv3DataCollator:
       - text tokens + bboxes (padded to batch-max length)
       - pixel_values (fixed shape from processor, just stacked)
       - labels (aligned + padded with -100)
+
+    ablation parameter:
+      - ""         : normal (all modalities used)
+      - "no_bbox"  : bbox zeroed out → model sees only text + image
+      - "no_image" : pixel_values zeroed out → model sees only text + bbox
     """
 
     def __init__(
@@ -77,10 +78,12 @@ class LayoutLMv3DataCollator:
         processor: LayoutLMv3Processor,
         max_length: int = 512,
         label_pad_id: int = -100,
+        ablation: str = "",
     ):
         self.processor = processor
         self.max_length = max_length
         self.label_pad_id = label_pad_id
+        self.ablation = ablation
 
     def __call__(self, features: list[dict]) -> dict[str, torch.Tensor]:
         batch_tokens    = [f["tokens"]   for f in features]
@@ -144,6 +147,12 @@ class LayoutLMv3DataCollator:
         padded_labels     = torch.stack([pad_1d(t, self.label_pad_id) for t in all_labels])
         pixel_values      = torch.stack(all_pixel_values)
 
+        # Ablation: zero out the specified modality
+        if self.ablation == "no_bbox":
+            padded_bboxes = torch.zeros_like(padded_bboxes)
+        elif self.ablation == "no_image":
+            pixel_values = torch.zeros_like(pixel_values)
+
         batch = {
             "input_ids":      padded_input_ids,
             "attention_mask": padded_attn_masks,
@@ -157,9 +166,7 @@ class LayoutLMv3DataCollator:
         return batch
 
 
-# ---------------------------------------------------------------------------
 # BERT collator
-# ---------------------------------------------------------------------------
 
 class BertDataCollator:
     """
